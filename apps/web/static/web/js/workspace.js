@@ -1,6 +1,6 @@
 /**
- * ProcuLedger — Zero-Login Recruiter Sandbox Client
- * Handles 1-click extraction, compliance audit, bounding-box overlays, and exports.
+ * ProcuLedger Studio — Enterprise Document-to-Ledger & Compliance Client
+ * Engineered for instant feedback, precision spatial coordinate mapping, and zero-latency audits.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -10,17 +10,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentBoundingBoxes = {};
     let currentDocType = 'SALES_INVOICE';
 
-    // DOM Elements
+    // DOM References
     const sampleCards = document.querySelectorAll('.sample-card');
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('fileInput');
     const btnRunAudit = document.getElementById('btnRunAudit');
+    const btnHeaderUpload = document.getElementById('btnHeaderUpload');
     const pdfIframe = document.getElementById('pdfIframe');
     const spatialOverlay = document.getElementById('spatialOverlay');
     const currentDocLabel = document.getElementById('currentDocLabel');
+    const viewerFileName = document.getElementById('viewerFileName');
     const btnOpenPdfNewTab = document.getElementById('btnOpenPdfNewTab');
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabPanels = document.querySelectorAll('.tab-panel');
+    const mobileTabButtons = document.querySelectorAll('.mobile-tab-btn');
 
     // Scorecard Elements
     const scoreCircle = document.getElementById('scoreCircle');
@@ -28,36 +31,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const overallStatusBadge = document.getElementById('overallStatusBadge');
     const detectedDocTypeBadge = document.getElementById('detectedDocTypeBadge');
     const auditSummaryText = document.getElementById('auditSummaryText');
+    const mobileScoreBadge = document.getElementById('mobileScoreBadge');
 
     // Audit Tab Elements
     const auditRulesList = document.getElementById('auditRulesList');
+    const rulesCountPill = document.getElementById('rulesCountPill');
 
     // Export Buttons
     const btnExportQuickBooks = document.getElementById('btnExportQuickBooks');
     const btnExportXero = document.getElementById('btnExportXero');
     const btnExportSLSP = document.getElementById('btnExportSLSP');
 
-    // 1. Initialize Default Sample
+    // 1. Initialize Active Document from first sample
     const firstActiveSample = document.querySelector('.sample-card.active');
     if (firstActiveSample) {
-        selectSample(firstActiveSample);
+        selectDocument(firstActiveSample);
     }
 
-    // 2. Sample Card Click Listener
+    // 2. Queue Item Selection
     sampleCards.forEach(card => {
         card.addEventListener('click', () => {
             sampleCards.forEach(c => c.classList.remove('active'));
             card.classList.add('active');
-            selectSample(card);
+            selectDocument(card);
         });
     });
 
-    function selectSample(card) {
+    function selectDocument(card) {
         activeDocId = card.getAttribute('data-id');
         activeDocUrl = card.getAttribute('data-url');
         const filename = card.getAttribute('data-filename');
 
-        currentDocLabel.textContent = filename;
+        if (currentDocLabel) currentDocLabel.textContent = filename;
+        if (viewerFileName) viewerFileName.textContent = filename;
+
         if (pdfIframe && activeDocUrl) {
             pdfIframe.src = activeDocUrl;
         }
@@ -65,55 +72,85 @@ document.addEventListener('DOMContentLoaded', () => {
             btnOpenPdfNewTab.href = activeDocUrl;
         }
 
-        // Reset export links
         updateExportLinks(activeDocId);
     }
 
-    // 3. Tab Navigation
+    // 3. Tab Navigation (Inspector)
     tabButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             tabButtons.forEach(b => b.classList.remove('active'));
             tabPanels.forEach(p => p.classList.remove('active'));
 
             btn.classList.add('active');
-            const target = btn.getAttribute('data-tab');
-            const panel = document.getElementById(target);
-            if (panel) panel.classList.add('active');
+            const targetId = btn.getAttribute('data-tab');
+            const targetPanel = document.getElementById(targetId);
+            if (targetPanel) targetPanel.classList.add('active');
         });
     });
 
-    // 4. File Upload & Drag-and-Drop
-    dropzone.addEventListener('click', () => fileInput.click());
+    // 4. Mobile View Switcher
+    if (mobileTabButtons.length > 0) {
+        mobileTabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                mobileTabButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const view = btn.getAttribute('data-view');
+                const paneViewer = document.getElementById('paneViewer');
+                const paneInspector = document.getElementById('paneInspector');
+                const paneQueue = document.getElementById('paneQueue');
 
-    dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('dragover');
-    });
+                if (window.innerWidth <= 900) {
+                    if (view === 'viewer') {
+                        if (paneViewer) paneViewer.scrollIntoView({ behavior: 'smooth' });
+                    } else if (view === 'inspector') {
+                        if (paneInspector) paneInspector.scrollIntoView({ behavior: 'smooth' });
+                    } else if (view === 'queue') {
+                        if (paneQueue) paneQueue.scrollIntoView({ behavior: 'smooth' });
+                    }
+                }
+            });
+        });
+    }
 
-    dropzone.addEventListener('dragleave', () => {
-        dropzone.classList.remove('dragover');
-    });
+    // 5. File Upload Triggers (Header button + Sidebar dropzone)
+    if (btnHeaderUpload) {
+        btnHeaderUpload.addEventListener('click', () => fileInput.click());
+    }
 
-    dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('dragover');
-        if (e.dataTransfer.files.length > 0) {
-            uploadFile(e.dataTransfer.files[0]);
-        }
-    });
+    if (dropzone) {
+        dropzone.addEventListener('click', () => fileInput.click());
 
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files.length > 0) {
-            uploadFile(fileInput.files[0]);
-        }
-    });
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
 
-    async function uploadFile(file) {
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                uploadDocument(e.dataTransfer.files[0]);
+            }
+        });
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                uploadDocument(fileInput.files[0]);
+            }
+        });
+    }
+
+    async function uploadDocument(file) {
         const formData = new FormData();
         formData.append('file', file);
 
-        btnRunAudit.disabled = true;
-        btnRunAudit.querySelector('span').textContent = 'Uploading PDF...';
+        setRunButtonLoading(true, 'Uploading Document...');
 
         try {
             const res = await fetch('/api/documents/upload/', {
@@ -121,43 +158,56 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: formData,
             });
 
-            if (!res.ok) throw new Error('Upload failed');
+            if (!res.ok) throw new Error('Document upload failed');
             const data = await res.json();
 
             activeDocId = data.id;
             activeDocUrl = data.file_url;
-            currentDocLabel.textContent = data.file_name;
+
+            if (currentDocLabel) currentDocLabel.textContent = data.file_name;
+            if (viewerFileName) viewerFileName.textContent = data.file_name;
             if (pdfIframe) pdfIframe.src = data.file_url;
             if (btnOpenPdfNewTab) btnOpenPdfNewTab.href = data.file_url;
 
-            // Deselect sample cards
+            // Deselect existing sample cards
             sampleCards.forEach(c => c.classList.remove('active'));
 
             updateExportLinks(activeDocId);
 
-            // Automatically trigger extract & audit on upload
+            // Automatically execute extraction and audit
             executeExtractAndAudit();
         } catch (err) {
-            alert('Error uploading file: ' + err.message);
+            alert('Upload Error: ' + err.message);
         } finally {
-            btnRunAudit.disabled = false;
-            btnRunAudit.querySelector('span').textContent = '1-Click Extract & Audit';
+            setRunButtonLoading(false);
         }
     }
 
-    // 5. 1-Click Extract & Audit Pipeline
-    btnRunAudit.addEventListener('click', () => {
-        executeExtractAndAudit();
-    });
+    // 6. Action Button: 1-Click Extract & Audit
+    if (btnRunAudit) {
+        btnRunAudit.addEventListener('click', () => {
+            executeExtractAndAudit();
+        });
+    }
+
+    function setRunButtonLoading(isLoading, customText) {
+        if (!btnRunAudit) return;
+        btnRunAudit.disabled = isLoading;
+        const textSpan = btnRunAudit.querySelector('span');
+        if (textSpan) {
+            textSpan.textContent = isLoading 
+                ? (customText || 'Analyzing & Auditing...') 
+                : '1-Click Extract & Audit';
+        }
+    }
 
     async function executeExtractAndAudit() {
         if (!activeDocId) {
-            alert('Please select a sample document or upload a PDF first.');
+            alert('Please select a document or upload a PDF first.');
             return;
         }
 
-        btnRunAudit.disabled = true;
-        btnRunAudit.querySelector('span').textContent = 'Analyzing & Auditing...';
+        setRunButtonLoading(true, 'Running Audit Engine...');
 
         try {
             const res = await fetch('/api/documents/extract-and-audit/', {
@@ -168,20 +218,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!res.ok) {
                 const errData = await res.json();
-                throw new Error(errData.error || 'Pipeline execution failed');
+                throw new Error(errData.error || 'Execution failed');
             }
 
             const data = await res.json();
             renderUnifiedResults(data);
         } catch (err) {
-            alert('Audit Pipeline Error: ' + err.message);
+            alert('Audit Engine Error: ' + err.message);
         } finally {
-            btnRunAudit.disabled = false;
-            btnRunAudit.querySelector('span').textContent = '1-Click Extract & Audit';
+            setRunButtonLoading(false);
         }
     }
 
-    // 6. Render Unified Results
+    // 7. Render Unified Results
     function renderUnifiedResults(payload) {
         const doc = payload.document;
         const extraction = payload.extraction;
@@ -191,19 +240,10 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBoundingBoxes = extraction.bounding_boxes || {};
         currentDocType = extraction.document_type || 'SALES_INVOICE';
 
-        // Update Scorecard
         renderScorecard(audit, currentDocType);
-
-        // Update Audit Tab
         renderAuditRules(audit.results || []);
-
-        // Update Extraction Tab
         renderExtractionFields(extraction.extracted_data || {});
-
-        // Update Ledger & Journal Entry
         renderLedgerEntry(ledger, extraction.extracted_data || {});
-
-        // Update Exporters
         updateExportLinks(doc.id);
     }
 
@@ -212,47 +252,59 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = audit.status || 'PASSED';
         const summary = audit.summary || '';
 
-        scoreValue.textContent = score;
+        if (scoreValue) scoreValue.textContent = score;
+        if (mobileScoreBadge) mobileScoreBadge.textContent = score;
 
-        // Circle color class
-        scoreCircle.className = 'score-circle';
-        if (status === 'PASSED') scoreCircle.classList.add('score-pass');
-        else if (status === 'WARNING') scoreCircle.classList.add('score-warn');
-        else scoreCircle.classList.add('score-fail');
-
-        // Status badge
-        overallStatusBadge.className = 'status-pill';
-        if (status === 'PASSED') {
-            overallStatusBadge.classList.add('status-pill-success');
-            overallStatusBadge.textContent = '100% COMPLIANT';
-        } else if (status === 'WARNING') {
-            overallStatusBadge.classList.add('status-pill-warning');
-            overallStatusBadge.textContent = 'WARNINGS DETECTED';
-        } else {
-            overallStatusBadge.classList.add('status-pill-danger');
-            overallStatusBadge.textContent = 'AUDIT FAILED';
+        if (scoreCircle) {
+            scoreCircle.className = 'score-circle';
+            if (status === 'PASSED') scoreCircle.classList.add('score-pass');
+            else if (status === 'WARNING') scoreCircle.classList.add('score-warn');
+            else scoreCircle.classList.add('score-fail');
         }
 
-        detectedDocTypeBadge.textContent = docType.replace('_', ' ');
-        auditSummaryText.textContent = summary;
+        if (overallStatusBadge) {
+            overallStatusBadge.className = 'badge';
+            if (status === 'PASSED') {
+                overallStatusBadge.classList.add('badge-success');
+                overallStatusBadge.innerHTML = '<span class="dot dot-success"></span> 100% COMPLIANT';
+            } else if (status === 'WARNING') {
+                overallStatusBadge.classList.add('badge-warning');
+                overallStatusBadge.innerHTML = '<span class="dot dot-warning"></span> WARNINGS DETECTED';
+            } else {
+                overallStatusBadge.classList.add('badge-danger');
+                overallStatusBadge.innerHTML = '<span class="dot dot-danger"></span> AUDIT FAILED';
+            }
+        }
+
+        if (detectedDocTypeBadge) {
+            detectedDocTypeBadge.textContent = docType.replace('_', ' ');
+        }
+        if (auditSummaryText) {
+            auditSummaryText.textContent = summary;
+        }
     }
 
     function renderAuditRules(results) {
+        if (!auditRulesList) return;
         auditRulesList.innerHTML = '';
+
+        if (rulesCountPill) {
+            rulesCountPill.textContent = results.length;
+        }
+
         if (results.length === 0) {
-            auditRulesList.innerHTML = '<div class="empty-state"><p>No audit rules executed.</p></div>';
+            auditRulesList.innerHTML = '<div class="empty-state-box"><p class="empty-title">No audit rules evaluated.</p></div>';
             return;
         }
 
         results.forEach(r => {
             const card = document.createElement('div');
-            card.className = `rule-card ${
-                r.status === 'PASS' ? 'rule-pass' :
-                r.status === 'WARNING' ? 'rule-warning' : 'rule-fail'
-            }`;
+            const isPass = r.status === 'PASS';
+            const isWarn = r.status === 'WARNING';
+            card.className = `rule-card ${isPass ? 'rule-pass' : isWarn ? 'rule-warning' : 'rule-fail'}`;
 
-            const pillClass = r.status === 'PASS' ? 'status-pill-success' :
-                              r.status === 'WARNING' ? 'status-pill-warning' : 'status-pill-danger';
+            const badgeClass = isPass ? 'badge-success' : isWarn ? 'badge-warning' : 'badge-danger';
+            const dotClass = isPass ? 'dot-success' : isWarn ? 'dot-warning' : 'dot-danger';
 
             let detailsHtml = '';
             if (r.details && Object.keys(r.details).length > 0) {
@@ -265,7 +317,9 @@ document.addEventListener('DOMContentLoaded', () => {
             card.innerHTML = `
                 <div class="rule-card-header">
                     <span class="rule-title">${r.rule_name}</span>
-                    <span class="status-pill ${pillClass}">${r.status}</span>
+                    <span class="badge ${badgeClass}">
+                        <span class="dot ${dotClass}"></span> ${r.status}
+                    </span>
                 </div>
                 <div class="rule-msg">${r.message}</div>
                 ${detailsHtml}
@@ -275,35 +329,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderExtractionFields(data) {
-        document.getElementById('fieldSupplierName').textContent = data.supplier_name || data.vendor_name || data.payee_name || '--';
-        document.getElementById('fieldSupplierTIN').textContent = data.supplier_tin || data.vendor_tin || data.payee_tin || '--';
-        document.getElementById('fieldSupplierAddress').textContent = data.supplier_address || 'Philippines';
+        setText('fieldSupplierName', data.supplier_name || data.vendor_name || data.payee_name || '--');
+        setText('fieldSupplierTIN', data.supplier_tin || data.vendor_tin || data.payee_tin || '--');
+        setText('fieldSupplierAddress', data.supplier_address || 'Philippines');
 
-        document.getElementById('fieldBuyerName').textContent = data.buyer_name || data.payor_name || '--';
-        document.getElementById('fieldBuyerTIN').textContent = data.buyer_tin || data.payor_tin || '--';
+        setText('fieldBuyerName', data.buyer_name || data.payor_name || '--');
+        setText('fieldBuyerTIN', data.buyer_tin || data.payor_tin || '--');
 
-        document.getElementById('fieldInvoiceNumber').textContent = data.invoice_number || data.po_number || data.atc_code || '--';
-        document.getElementById('fieldInvoiceDate').textContent = data.invoice_date || data.po_date || '--';
-        document.getElementById('fieldPORef').textContent = data.po_reference || '--';
-        document.getElementById('fieldATPNumber').textContent = data.atp_number || 'N/A';
+        setText('fieldInvoiceNumber', data.invoice_number || data.po_number || data.atc_code || '--');
+        setText('fieldInvoiceDate', data.invoice_date || data.po_date || '--');
+        setText('fieldPORef', data.po_reference || '--');
+        setText('fieldATPNumber', data.atp_number || 'N/A');
 
-        // Line Items
+        // Line Items Table
         const tbody = document.getElementById('lineItemsBody');
-        tbody.innerHTML = '';
-        const items = data.line_items || [];
-        if (items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No line items extracted.</td></tr>';
-        } else {
-            items.forEach(it => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${it.description}</td>
-                    <td class="text-right">${parseFloat(it.quantity || 1).toFixed(2)}</td>
-                    <td class="text-right">₱${parseFloat(it.unit_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                    <td class="text-right">₱${parseFloat(it.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+        if (tbody) {
+            tbody.innerHTML = '';
+            const items = data.line_items || [];
+            if (items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="table-empty-cell">No line items extracted.</td></tr>';
+            } else {
+                items.forEach(it => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${it.description}</td>
+                        <td class="col-num">${parseFloat(it.quantity || 1).toFixed(2)}</td>
+                        <td class="col-num">₱${parseFloat(it.unit_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td class="col-num">₱${parseFloat(it.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
         }
 
         // Totals
@@ -313,11 +369,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const zero = parseFloat(data.zero_rated_sales || 0);
         const total = parseFloat(data.total_amount || 0);
 
-        document.getElementById('fieldVatableSales').textContent = `PHP ${vatable.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-        document.getElementById('fieldVatAmount').textContent = `PHP ${vat.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-        document.getElementById('fieldVatExempt').textContent = `PHP ${exempt.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-        document.getElementById('fieldZeroRated').textContent = `PHP ${zero.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-        document.getElementById('fieldTotalAmount').textContent = `PHP ${total.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+        setText('fieldVatableSales', `PHP ${vatable.toLocaleString('en-US', {minimumFractionDigits: 2})}`);
+        setText('fieldVatAmount', `PHP ${vat.toLocaleString('en-US', {minimumFractionDigits: 2})}`);
+        setText('fieldVatExempt', `PHP ${exempt.toLocaleString('en-US', {minimumFractionDigits: 2})}`);
+        setText('fieldZeroRated', `PHP ${zero.toLocaleString('en-US', {minimumFractionDigits: 2})}`);
+        setText('fieldTotalAmount', `PHP ${total.toLocaleString('en-US', {minimumFractionDigits: 2})}`);
 
         setupBoundingBoxHighlights();
     }
@@ -327,23 +383,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const vat = parseFloat(ledger ? ledger.vat_amount : extractedData.vat_amount || 0);
         const total = parseFloat(ledger ? ledger.total_amount : extractedData.total_amount || 0);
 
-        document.getElementById('journalDebitExpense').textContent = vatable.toLocaleString('en-US', {minimumFractionDigits: 2});
-        document.getElementById('journalDebitVAT').textContent = vat.toLocaleString('en-US', {minimumFractionDigits: 2});
-        document.getElementById('journalCreditAP').textContent = total.toLocaleString('en-US', {minimumFractionDigits: 2});
+        setText('journalDebitExpense', vatable.toLocaleString('en-US', {minimumFractionDigits: 2}));
+        setText('journalDebitVAT', vat.toLocaleString('en-US', {minimumFractionDigits: 2}));
+        setText('journalCreditAP', total.toLocaleString('en-US', {minimumFractionDigits: 2}));
 
         const totalDebit = vatable + vat;
-        document.getElementById('journalTotalDebit').textContent = totalDebit.toLocaleString('en-US', {minimumFractionDigits: 2});
-        document.getElementById('journalTotalCredit').textContent = total.toLocaleString('en-US', {minimumFractionDigits: 2});
+        setText('journalTotalDebit', totalDebit.toLocaleString('en-US', {minimumFractionDigits: 2}));
+        setText('journalTotalCredit', total.toLocaleString('en-US', {minimumFractionDigits: 2}));
     }
 
     function updateExportLinks(docId) {
         if (!docId) return;
-        btnExportQuickBooks.href = `/api/documents/${docId}/export/quickbooks/`;
-        btnExportXero.href = `/api/documents/${docId}/export/xero/`;
-        btnExportSLSP.href = `/api/documents/export/slsp/?document_id=${docId}`;
+        if (btnExportQuickBooks) btnExportQuickBooks.href = `/api/documents/${docId}/export/quickbooks/`;
+        if (btnExportXero) btnExportXero.href = `/api/documents/${docId}/export/xero/`;
+        if (btnExportSLSP) btnExportSLSP.href = `/api/documents/export/slsp/?document_id=${docId}`;
     }
 
-    // 7. Interactive Bounding Box Highlights
+    function setText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+
+    // 8. Spatial Bounding Box Coordinate Mapping
     function setupBoundingBoxHighlights() {
         const highlightables = document.querySelectorAll('.highlightable');
         highlightables.forEach(el => {
@@ -365,9 +426,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const boxEl = document.createElement('div');
         boxEl.className = 'highlight-box';
 
-        // Coordinates in PDF points (relative to 612 x 792 standard letter)
-        const containerWidth = spatialOverlay.clientWidth || 500;
-        const containerHeight = spatialOverlay.clientHeight || 650;
+        const containerWidth = spatialOverlay.clientWidth || 550;
+        const containerHeight = spatialOverlay.clientHeight || 750;
 
         const scaleX = containerWidth / 612;
         const scaleY = containerHeight / 792;

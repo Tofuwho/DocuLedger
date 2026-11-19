@@ -3,275 +3,330 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProcuLedger — Automated Document-to-Ledger & Compliance Audit</title>
+    <title>ProcuLedger — Automated Document-to-Ledger & Compliance Audit Studio</title>
     <link rel="stylesheet" href="/static/web/css/workspace.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
-<body>
-    <!-- Top Navigation Bar -->
-    <header class="navbar">
-        <div class="nav-brand">
-            <div class="brand-logo">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                </svg>
+<body class="app-shell">
+    <!-- Top Global App Bar -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="brand">
+                <div class="brand-mark">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-name">ProcuLedger</span>
+                    <span class="brand-badge">Studio</span>
+                </div>
             </div>
-            <div>
-                <span class="brand-title">ProcuLedger</span>
-                <span class="brand-subtitle">Automated Tax & Ledger Audit Engine</span>
+
+            <div class="header-sep"></div>
+
+            <div class="active-doc-breadcrumb">
+                <span class="breadcrumb-label">Document:</span>
+                <span class="breadcrumb-value" id="currentDocLabel">Select a document</span>
             </div>
         </div>
 
-        <div class="nav-badges">
-            <span class="pill pill-green">TRAIN Law & EOPT Ready</span>
-            <span class="pill pill-blue">12% VAT Audit</span>
-            <span class="pill pill-purple">PO 3-Way Match</span>
-            <span class="pill pill-amber">BIR 2307 EWT</span>
-            <span class="pill pill-neutral">Offline Resilient</span>
+        <div class="header-center">
+            <div class="system-status-indicator">
+                <span class="status-pulse-dot"></span>
+                <span class="status-text">Deterministic Audit Engine Operational</span>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <button class="btn btn-secondary" id="btnHeaderUpload">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <span>Upload PDF</span>
+            </button>
+            <button class="btn btn-primary" id="btnRunAudit">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span>1-Click Extract & Audit</span>
+            </button>
         </div>
     </header>
 
-    <!-- Main Workspace Container -->
-    <main class="workspace-container">
-        <!-- LEFT PANEL: Document Source & Visual Viewer -->
-        <section class="panel left-panel">
-            <div class="panel-header">
-                <h2>1. Select or Upload Document</h2>
-                <span class="step-tag">Recruiter Sandbox</span>
-            </div>
+    <!-- Mobile Segmented View Switcher (Visible on mobile/tablet) -->
+    <div class="mobile-view-tabs" id="mobileViewTabs">
+        <button class="mobile-tab-btn active" data-view="viewer">Document Canvas</button>
+        <button class="mobile-tab-btn" data-view="inspector">Audit & Ledger (<span id="mobileScoreBadge">--</span>)</button>
+        <button class="mobile-tab-btn" data-view="queue">Queue (<span id="mobileQueueCount">{{ samples|length }}</span>)</button>
+    </div>
 
-            <!-- Pre-Seeded Sample Document Picker -->
-            <div class="sample-picker-section">
-                <label class="section-label">Pre-Seeded Sample Documents (1-Click Ready):</label>
-                <div class="sample-grid">
-                    {% for sample in samples %}
-                    <div class="sample-card {% if forloop.first %}active{% endif %}" 
-                         data-id="{{ sample.id }}" 
-                         data-filename="{{ sample.file_name }}"
-                         data-url="{{ sample.file.url }}">
-                        <div class="sample-header">
-                            <span class="sample-type">{{ sample.get_document_type_display }}</span>
-                            {% if "Compliant" in sample.file_name %}
-                                <span class="status-pill status-pill-success">100% Compliant</span>
-                            {% elif "VAT_Discrepancy" in sample.file_name %}
-                                <span class="status-pill status-pill-danger">VAT Discrepancy</span>
-                            {% else %}
-                                <span class="status-pill status-pill-info">3-Way Match</span>
-                            {% endif %}
-                        </div>
-                        <div class="sample-name">{{ sample.file_name }}</div>
-                        <div class="sample-desc">
-                            {% if "Compliant" in sample.file_name %}
-                                Clean invoice with 12% VAT, valid 12-digit TIN, and BIR ATP.
-                            {% elif "VAT_Discrepancy" in sample.file_name %}
-                                Catches 10% VAT calculation error & 8-digit invalid TIN.
-                            {% else %}
-                                Reconciles Sales Invoice against PO-2024-8891 and BIR Form 2307.
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="no-samples-alert">
-                        No pre-seeded samples found. Run <code>python manage.py seed_ph_samples</code> to load them.
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- Upload Custom File Dropzone -->
-            <div class="upload-section">
-                <div class="dropzone" id="dropzone">
-                    <input type="file" id="fileInput" accept=".pdf" class="file-input-hidden">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="17 8 12 3 7 8"></polyline>
-                        <line x1="12" y1="3" x2="12" y2="15"></line>
+    <!-- 3-Pane Studio Layout -->
+    <div class="studio-workspace">
+        <!-- PANE 1: Document Queue & Pre-Loaded Invoices (Left Sidebar) -->
+        <aside class="pane pane-queue" id="paneQueue">
+            <div class="pane-header">
+                <div class="pane-title-group">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="8" y1="6" x2="21" y2="6"></line>
+                        <line x1="8" y1="12" x2="21" y2="12"></line>
+                        <line x1="8" y1="18" x2="21" y2="18"></line>
+                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
                     </svg>
-                    <p class="dropzone-text"><strong>Click to upload</strong> or drag & drop PDF</p>
-                    <p class="dropzone-sub">Supports digital Sales Invoices, Purchase Orders, and BIR 2307</p>
+                    <span class="pane-title">Document Queue</span>
                 </div>
+                <span class="count-tag">{{ samples|length }} Loaded</span>
             </div>
 
-            <!-- Primary Action Button -->
-            <div class="action-bar">
-                <button id="btnRunAudit" class="btn-primary">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg>
-                    <span>1-Click Extract & Audit</span>
-                </button>
-            </div>
-
-            <!-- Document Visual Canvas / Spatial Preview -->
-            <div class="pdf-viewer-container">
-                <div class="viewer-toolbar">
-                    <span id="currentDocLabel">Source PDF Preview</span>
-                    <div class="toolbar-actions">
-                        <span id="bboxHoverIndicator" class="bbox-indicator">Hover field to locate</span>
-                        <a id="btnOpenPdfNewTab" href="#" target="_blank" rel="noopener noreferrer" class="toolbar-link" title="Open PDF in a new tab">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                            Full PDF
-                        </a>
+            <!-- Queue Scroll List -->
+            <div class="queue-list" id="queueList">
+                {% for sample in samples %}
+                <div class="queue-card sample-card {% if forloop.first %}active{% endif %}" 
+                     data-id="{{ sample.id }}" 
+                     data-filename="{{ sample.file_name }}"
+                     data-url="{{ sample.file.url }}">
+                    <div class="queue-card-top">
+                        <span class="doc-type-tag">{{ sample.get_document_type_display }}</span>
+                        {% if "Compliant" in sample.file_name %}
+                            <span class="badge badge-success">
+                                <span class="dot dot-success"></span> Compliant
+                            </span>
+                        {% elif "VAT_Discrepancy" in sample.file_name %}
+                            <span class="badge badge-danger">
+                                <span class="dot dot-danger"></span> Discrepancy
+                            </span>
+                        {% else %}
+                            <span class="badge badge-info">
+                                <span class="dot dot-info"></span> 3-Way Match
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div class="queue-card-name">{{ sample.file_name }}</div>
+                    <div class="queue-card-desc">
+                        {% if "Compliant" in sample.file_name %}
+                            12% VAT, 12-digit TIN, ATP
+                        {% elif "VAT_Discrepancy" in sample.file_name %}
+                            Intentional 10% VAT error & defective TIN
+                        {% else %}
+                            Reconciles SI against PO & Form 2307
+                        {% endif %}
                     </div>
                 </div>
-                <div class="viewer-body" id="viewerBody">
-                    <iframe id="pdfIframe" src="" class="pdf-frame"></iframe>
-                    <div id="spatialOverlay" class="spatial-overlay"></div>
+                {% empty %}
+                <div class="queue-empty">
+                    No documents loaded. Run <code>python manage.py seed_ph_samples</code> to seed.
                 </div>
+                {% endfor %}
+            </div>
+
+            <!-- Upload Dropzone (Docked at sidebar bottom) -->
+            <div class="queue-upload-box" id="dropzone">
+                <input type="file" id="fileInput" accept=".pdf" class="file-input-hidden">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <div class="upload-text">
+                    <span class="upload-primary">Drop PDF document here</span>
+                    <span class="upload-sub">or click to browse local files</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- PANE 2: High-Resolution Document Canvas (Center Flexible 1fr) -->
+        <section class="pane pane-viewer" id="paneViewer">
+            <div class="viewer-toolbar">
+                <div class="toolbar-left">
+                    <span class="viewer-doc-badge">Source Preview</span>
+                    <span class="viewer-file-title" id="viewerFileName">PH_Sample_Invoice_Compliant.pdf</span>
+                </div>
+                <div class="toolbar-right">
+                    <span id="bboxHoverIndicator" class="bbox-hint-pill">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        Hover field to locate
+                    </span>
+                    <a id="btnOpenPdfNewTab" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm" title="Open PDF in a new tab">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        <span>Full PDF</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="viewer-canvas" id="viewerBody">
+                <iframe id="pdfIframe" src="" class="pdf-iframe-element"></iframe>
+                <div id="spatialOverlay" class="spatial-overlay"></div>
             </div>
         </section>
 
-        <!-- RIGHT PANEL: Extraction, Audit Diagnostics, and Ledger -->
-        <section class="panel right-panel">
-            <!-- Scorecard Banner -->
-            <div class="scorecard-banner" id="scorecardBanner">
-                <div class="score-circular-wrapper">
-                    <div class="score-circle" id="scoreCircle">
-                        <span id="scoreValue">--</span>
-                        <span class="score-sub">/ 100</span>
+        <!-- PANE 3: Intelligence, Audit & Ledger Inspector (Right Sidebar) -->
+        <aside class="pane pane-inspector" id="paneInspector">
+            <!-- Executive Scorecard Banner -->
+            <div class="inspector-summary-banner" id="scorecardBanner">
+                <div class="score-radial-wrapper">
+                    <div class="score-circle score-pending" id="scoreCircle">
+                        <span class="score-number" id="scoreValue">--</span>
+                        <span class="score-denom">/ 100</span>
                     </div>
                 </div>
-                <div class="score-info">
-                    <div class="score-status-row">
-                        <span class="status-pill status-pill-pending" id="overallStatusBadge">Awaiting Execution</span>
-                        <span class="doc-type-badge" id="detectedDocTypeBadge">--</span>
+                <div class="score-meta">
+                    <div class="score-badges-row">
+                        <span class="badge badge-neutral" id="overallStatusBadge">Awaiting Audit</span>
+                        <span class="badge badge-outline" id="detectedDocTypeBadge">SALES INVOICE</span>
                     </div>
-                    <h3 id="auditSummaryText">Select a sample or upload a document and click "1-Click Extract & Audit".</h3>
-                    <p id="auditSubText" class="audit-sub">Complies with statutory BIR Revenue Regulations & TRAIN law.</p>
+                    <h3 class="score-headline" id="auditSummaryText">Select a document and run audit engine.</h3>
+                    <p class="score-subtext" id="auditSubText">Verifies 12% VAT calculations, TIN checksums, ATP markers, and double-entry balancing.</p>
                 </div>
             </div>
 
-            <!-- Interactive Tab Headers -->
-            <div class="tab-headers">
+            <!-- Inspector Tab Switcher -->
+            <div class="inspector-tabs">
                 <button class="tab-btn active" data-tab="tab-audit">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                    Compliance Audit
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    <span>Audit Rules</span>
+                    <span class="tab-count-pill" id="rulesCountPill">8</span>
                 </button>
                 <button class="tab-btn" data-tab="tab-extraction">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                    Extracted Fields
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    <span>Extracted Fields</span>
                 </button>
                 <button class="tab-btn" data-tab="tab-ledger">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                    Ledger & Exporters
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    <span>Ledger & Exports</span>
                 </button>
             </div>
 
-            <!-- Tab Content Containers -->
-            <div class="tab-contents">
-                <!-- TAB 1: COMPLIANCE AUDIT -->
+            <!-- Tab Contents Container (Scrollable) -->
+            <div class="inspector-content">
+                <!-- TAB 1: COMPLIANCE AUDIT RULES -->
                 <div class="tab-panel active" id="tab-audit">
-                    <div class="audit-rules-list" id="auditRulesList">
-                        <div class="empty-state">
-                            <p>No audit results yet. Click <strong>"1-Click Extract & Audit"</strong> on the left panel to execute the deterministic rule engine.</p>
+                    <div class="rules-list" id="auditRulesList">
+                        <div class="empty-state-box">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            <p class="empty-title">Deterministic Engine Ready</p>
+                            <p class="empty-sub">Click <strong>"1-Click Extract & Audit"</strong> in the top header to run all 8 statutory rules against the selected document.</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- TAB 2: EXTRACTION RESULTS -->
+                <!-- TAB 2: EXTRACTED FIELDS & METADATA -->
                 <div class="tab-panel" id="tab-extraction">
-                    <div class="extraction-view" id="extractionView">
-                        <!-- Entity Cards -->
-                        <div class="two-column-grid">
-                            <div class="info-card">
-                                <h4>Supplier (Seller)</h4>
-                                <div class="field-row">
-                                    <span class="field-label">Name:</span>
-                                    <span class="field-value highlightable" id="fieldSupplierName" data-field="supplier_name">--</span>
+                    <div class="extraction-container">
+                        <!-- Entities Grid -->
+                        <div class="grid-two-col">
+                            <div class="data-group-card">
+                                <div class="card-title-bar">
+                                    <span class="card-title">Supplier / Vendor</span>
                                 </div>
-                                <div class="field-row">
-                                    <span class="field-label">TIN:</span>
-                                    <span class="field-value highlightable" id="fieldSupplierTIN" data-field="supplier_tin">--</span>
+                                <div class="prop-row">
+                                    <span class="prop-label">Name:</span>
+                                    <span class="prop-value highlightable" id="fieldSupplierName" data-field="supplier_name">--</span>
                                 </div>
-                                <div class="field-row">
-                                    <span class="field-label">Address:</span>
-                                    <span class="field-value" id="fieldSupplierAddress">--</span>
+                                <div class="prop-row">
+                                    <span class="prop-label">TIN:</span>
+                                    <span class="prop-value highlightable" id="fieldSupplierTIN" data-field="supplier_tin">--</span>
+                                </div>
+                                <div class="prop-row">
+                                    <span class="prop-label">Address:</span>
+                                    <span class="prop-value" id="fieldSupplierAddress">--</span>
                                 </div>
                             </div>
 
-                            <div class="info-card">
-                                <h4>Customer (Buyer)</h4>
-                                <div class="field-row">
-                                    <span class="field-label">Name:</span>
-                                    <span class="field-value highlightable" id="fieldBuyerName" data-field="buyer_name">--</span>
+                            <div class="data-group-card">
+                                <div class="card-title-bar">
+                                    <span class="card-title">Customer / Buyer</span>
                                 </div>
-                                <div class="field-row">
-                                    <span class="field-label">TIN:</span>
-                                    <span class="field-value highlightable" id="fieldBuyerTIN" data-field="buyer_tin">--</span>
+                                <div class="prop-row">
+                                    <span class="prop-label">Name:</span>
+                                    <span class="prop-value highlightable" id="fieldBuyerName" data-field="buyer_name">--</span>
+                                </div>
+                                <div class="prop-row">
+                                    <span class="prop-label">TIN:</span>
+                                    <span class="prop-value highlightable" id="fieldBuyerTIN" data-field="buyer_tin">--</span>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Invoice Metadata -->
-                        <div class="info-card mt-3">
-                            <h4>Invoice Information & BIR Markers</h4>
-                            <div class="three-column-grid">
-                                <div class="field-row">
-                                    <span class="field-label">Invoice #:</span>
-                                    <span class="field-value highlightable" id="fieldInvoiceNumber" data-field="invoice_number">--</span>
+                        <div class="data-group-card mt-3">
+                            <div class="card-title-bar">
+                                <span class="card-title">Invoice Metadata & Statutory Markers</span>
+                            </div>
+                            <div class="grid-four-col">
+                                <div class="prop-row">
+                                    <span class="prop-label">Invoice #:</span>
+                                    <span class="prop-value highlightable" id="fieldInvoiceNumber" data-field="invoice_number">--</span>
                                 </div>
-                                <div class="field-row">
-                                    <span class="field-label">Invoice Date:</span>
-                                    <span class="field-value highlightable" id="fieldInvoiceDate" data-field="invoice_date">--</span>
+                                <div class="prop-row">
+                                    <span class="prop-label">Invoice Date:</span>
+                                    <span class="prop-value highlightable" id="fieldInvoiceDate" data-field="invoice_date">--</span>
                                 </div>
-                                <div class="field-row">
-                                    <span class="field-label">PO Ref:</span>
-                                    <span class="field-value highlightable" id="fieldPORef" data-field="po_reference">--</span>
+                                <div class="prop-row">
+                                    <span class="prop-label">PO Ref:</span>
+                                    <span class="prop-value highlightable" id="fieldPORef" data-field="po_reference">--</span>
                                 </div>
-                                <div class="field-row">
-                                    <span class="field-label">BIR ATP / PTU:</span>
-                                    <span class="field-value highlightable" id="fieldATPNumber" data-field="atp_number">--</span>
+                                <div class="prop-row">
+                                    <span class="prop-label">ATP / PTU:</span>
+                                    <span class="prop-value highlightable" id="fieldATPNumber" data-field="atp_number">--</span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Line Items -->
-                        <div class="info-card mt-3">
-                            <h4>Line Items</h4>
-                            <div class="table-responsive">
-                                <table class="data-table" id="lineItemsTable">
+                        <!-- Line Items Table -->
+                        <div class="data-group-card mt-3">
+                            <div class="card-title-bar">
+                                <span class="card-title">Line Items</span>
+                            </div>
+                            <div class="table-container">
+                                <table class="studio-table" id="lineItemsTable">
                                     <thead>
                                         <tr>
                                             <th>Description</th>
-                                            <th class="text-right">Qty</th>
-                                            <th class="text-right">Unit Price</th>
-                                            <th class="text-right">Amount</th>
+                                            <th class="col-num">Qty</th>
+                                            <th class="col-num">Unit Price</th>
+                                            <th class="col-num">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody id="lineItemsBody">
-                                        <tr><td colspan="4" class="text-center text-muted">No line items extracted.</td></tr>
+                                        <tr><td colspan="4" class="table-empty-cell">No line items extracted.</td></tr>
                                     </tbody>
                                 </table>
                             </div>
                         </div>
 
                         <!-- Financial Totals -->
-                        <div class="info-card mt-3 financial-totals-card">
-                            <h4>Tax & Amount Breakdown</h4>
-                            <div class="totals-table">
-                                <div class="total-row">
+                        <div class="data-group-card mt-3 totals-card">
+                            <div class="card-title-bar">
+                                <span class="card-title">Financial & Tax Breakdown</span>
+                            </div>
+                            <div class="totals-breakdown">
+                                <div class="total-line">
                                     <span>Vatable Sales (Base Net of VAT):</span>
                                     <strong id="fieldVatableSales" class="highlightable" data-field="vatable_sales">PHP 0.00</strong>
                                 </div>
-                                <div class="total-row">
+                                <div class="total-line">
                                     <span>12% Value-Added Tax (VAT):</span>
                                     <strong id="fieldVatAmount" class="highlightable" data-field="vat_amount">PHP 0.00</strong>
                                 </div>
-                                <div class="total-row">
+                                <div class="total-line">
                                     <span>VAT-Exempt Sales:</span>
                                     <strong id="fieldVatExempt">PHP 0.00</strong>
                                 </div>
-                                <div class="total-row">
+                                <div class="total-line">
                                     <span>Zero-Rated Sales:</span>
                                     <strong id="fieldZeroRated">PHP 0.00</strong>
                                 </div>
-                                <div class="total-row grand-total-row">
+                                <div class="total-line total-grand">
                                     <span>Total Amount Due:</span>
                                     <strong id="fieldTotalAmount" class="highlightable" data-field="total_amount">PHP 0.00</strong>
                                 </div>
@@ -282,44 +337,42 @@
 
                 <!-- TAB 3: ACCOUNTING LEDGER & EXPORTS -->
                 <div class="tab-panel" id="tab-ledger">
-                    <div class="ledger-view">
-                        <!-- Journal Entry Preview -->
-                        <div class="info-card">
-                            <h4>Accounting Journal Entry Preview (Double-Entry)</h4>
-                            <div class="table-responsive">
-                                <table class="data-table">
+                    <div class="ledger-container">
+                        <!-- Journal Entry -->
+                        <div class="data-group-card">
+                            <div class="card-title-bar">
+                                <span class="card-title">Double-Entry Journal Entry Preview</span>
+                                <span class="badge badge-success">Balanced</span>
+                            </div>
+                            <div class="table-container">
+                                <table class="studio-table">
                                     <thead>
                                         <tr>
                                             <th>Account Code & Title</th>
-                                            <th class="text-right">Debit (PHP)</th>
-                                            <th class="text-right">Credit (PHP)</th>
+                                            <th class="col-num">Debit (PHP)</th>
+                                            <th class="col-num">Credit (PHP)</th>
                                         </tr>
                                     </thead>
                                     <tbody id="journalEntryBody">
                                         <tr>
                                             <td>50000 Purchases / Cost of Goods Sold</td>
-                                            <td class="text-right" id="journalDebitExpense">0.00</td>
-                                            <td class="text-right">-</td>
+                                            <td class="col-num" id="journalDebitExpense">0.00</td>
+                                            <td class="col-num">-</td>
                                         </tr>
                                         <tr>
-                                            <td>12000 Input Tax (12% Philippine VAT)</td>
-                                            <td class="text-right" id="journalDebitVAT">0.00</td>
-                                            <td class="text-right">-</td>
-                                        </tr>
-                                        <tr id="journalEwtRow" style="display: none;">
-                                            <td>21000 Creditable Withholding Tax (BIR Form 2307)</td>
-                                            <td class="text-right">-</td>
-                                            <td class="text-right" id="journalCreditEWT">0.00</td>
+                                            <td>12000 Input Tax (12% VAT)</td>
+                                            <td class="col-num" id="journalDebitVAT">0.00</td>
+                                            <td class="col-num">-</td>
                                         </tr>
                                         <tr>
                                             <td>20000 Accounts Payable / Vendor Liability</td>
-                                            <td class="text-right">-</td>
-                                            <td class="text-right" id="journalCreditAP">0.00</td>
+                                            <td class="col-num">-</td>
+                                            <td class="col-num" id="journalCreditAP">0.00</td>
                                         </tr>
-                                        <tr class="table-total-row">
+                                        <tr class="table-summary-row">
                                             <td><strong>Totals (Balanced):</strong></td>
-                                            <td class="text-right"><strong id="journalTotalDebit">0.00</strong></td>
-                                            <td class="text-right"><strong id="journalTotalCredit">0.00</strong></td>
+                                            <td class="col-num"><strong id="journalTotalDebit">0.00</strong></td>
+                                            <td class="col-num"><strong id="journalTotalCredit">0.00</strong></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -327,29 +380,31 @@
                         </div>
 
                         <!-- 1-Click Exporters -->
-                        <div class="info-card mt-3">
-                            <h4>1-Click Accounting & Tax Exporters</h4>
-                            <p class="export-sub">Export verified entries directly into ERP formats or official BIR statutory filings:</p>
-                            <div class="export-buttons-grid">
+                        <div class="data-group-card mt-3">
+                            <div class="card-title-bar">
+                                <span class="card-title">1-Click Accounting & Tax Exporters</span>
+                            </div>
+                            <p class="export-lead-text">Export verified ledger entries directly into major accounting platforms and official statutory schedules:</p>
+                            <div class="export-actions-grid">
                                 <a id="btnExportQuickBooks" href="#" class="btn-export btn-qb">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                                    QuickBooks Online CSV
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    <span>QuickBooks Online CSV</span>
                                 </a>
                                 <a id="btnExportXero" href="#" class="btn-export btn-xero">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                                    Xero Accounting CSV
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    <span>Xero Accounting CSV</span>
                                 </a>
                                 <a id="btnExportSLSP" href="#" class="btn-export btn-bir">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                                    BIR SLSP Purchases CSV
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    <span>BIR SLSP Schedule 3 CSV</span>
                                 </a>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </section>
-    </main>
+        </aside>
+    </div>
 
     <script src="/static/web/js/workspace.js"></script>
 </body>
