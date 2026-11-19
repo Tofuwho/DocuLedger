@@ -1,0 +1,6 @@
+from django.apps import AppConfig
+
+class AuditorConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.auditor'
+    verbose_name = 'Philippine Tax & Ledger Compliance Auditor'

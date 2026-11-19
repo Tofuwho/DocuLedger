@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuLedger PH — Automated Document-to-Ledger & Compliance Audit</title>
+    <link rel="stylesheet" href="/static/web/css/workspace.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <header class="navbar">
+        <div class="nav-brand">
+            <div class="brand-logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+            </div>
+            <div>
+                <span class="brand-title">DocuLedger <span class="badge-ph">PH</span></span>
+                <span class="brand-subtitle">Philippine Tax & Ledger Audit Engine</span>
+            </div>
+        </div>
+
+        <div class="nav-badges">
+            <span class="pill pill-green">TRAIN Law & EOPT Ready</span>
+            <span class="pill pill-blue">12% VAT Audit</span>
+            <span class="pill pill-purple">PO 3-Way Match</span>
+            <span class="pill pill-amber">BIR 2307 EWT</span>
+            <span class="pill pill-neutral">Offline Resilient</span>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="workspace-container">
+        <!-- LEFT PANEL: Document Source & Visual Viewer -->
+        <section class="panel left-panel">
+            <div class="panel-header">
+                <h2>1. Select or Upload Document</h2>
+                <span class="step-tag">Recruiter Sandbox</span>
+            </div>
+
+            <!-- Pre-Seeded Sample Document Picker -->
+            <div class="sample-picker-section">
+                <label class="section-label">Pre-Seeded Philippine Samples (1-Click Ready):</label>
+                <div class="sample-grid">
+                    {% for sample in samples %}
+                    <div class="sample-card {% if forloop.first %}active{% endif %}" 
+                         data-id="{{ sample.id }}" 
+                         data-filename="{{ sample.file_name }}"
+                         data-url="{{ sample.file.url }}">
+                        <div class="sample-header">
+                            <span class="sample-type">{{ sample.get_document_type_display }}</span>
+                            {% if "Compliant" in sample.file_name %}
+                                <span class="status-pill status-pill-success">100% Compliant</span>
+                            {% elif "VAT_Discrepancy" in sample.file_name %}
+                                <span class="status-pill status-pill-danger">VAT Discrepancy</span>
+                            {% else %}
+                                <span class="status-pill status-pill-info">3-Way Match</span>
+                            {% endif %}
+                        </div>
+                        <div class="sample-name">{{ sample.file_name }}</div>
+                        <div class="sample-desc">
+                            {% if "Compliant" in sample.file_name %}
+                                Clean invoice with 12% VAT, valid 12-digit TIN, and BIR ATP.
+                            {% elif "VAT_Discrepancy" in sample.file_name %}
+                                Catches 10% VAT calculation error & 8-digit invalid TIN.
+                            {% else %}
+                                Reconciles Sales Invoice against PO-2024-8891 and BIR Form 2307.
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="no-samples-alert">
+                        No pre-seeded samples found. Run <code>python manage.py seed_ph_samples</code> to load them.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Upload Custom File Dropzone -->
+            <div class="upload-section">
+                <div class="dropzone" id="dropzone">
+                    <input type="file" id="fileInput" accept=".pdf" class="file-input-hidden">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p class="dropzone-text"><strong>Click to upload</strong> or drag & drop Philippine PDF</p>
+                    <p class="dropzone-sub">Supports digital Sales Invoices, Purchase Orders, and BIR 2307</p>
+                </div>
+            </div>
+
+            <!-- Primary Action Button -->
+            <div class="action-bar">
+                <button id="btnRunAudit" class="btn-primary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span>1-Click Extract & Audit</span>
+                </button>
+            </div>
+
+            <!-- Document Visual Canvas / Spatial Preview -->
+            <div class="pdf-viewer-container">
+                <div class="viewer-toolbar">
+                    <span id="currentDocLabel">Source PDF Preview</span>
+                    <span id="bboxHoverIndicator" class="bbox-indicator">Hover field to locate bounding box</span>
+                </div>
+                <div class="viewer-body" id="viewerBody">
+                    <iframe id="pdfIframe" src="" class="pdf-frame"></iframe>
+                    <div id="spatialOverlay" class="spatial-overlay"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL: Extraction, Audit Diagnostics, and Ledger -->
+        <section class="panel right-panel">
+            <!-- Scorecard Banner -->
+            <div class="scorecard-banner" id="scorecardBanner">
+                <div class="score-circular-wrapper">
+                    <div class="score-circle" id="scoreCircle">
+                        <span id="scoreValue">--</span>
+                        <span class="score-sub">/ 100</span>
+                    </div>
+                </div>
+                <div class="score-info">
+                    <div class="score-status-row">
+                        <span class="status-pill status-pill-pending" id="overallStatusBadge">Awaiting Execution</span>
+                        <span class="doc-type-badge" id="detectedDocTypeBadge">--</span>
+                    </div>
+                    <h3 id="auditSummaryText">Select a sample or upload a document and click "1-Click Extract & Audit".</h3>
+                    <p id="auditSubText" class="audit-sub">Complies with Philippine BIR Revenue Regulations & TRAIN law.</p>
+                </div>
+            </div>
+
+            <!-- Interactive Tab Headers -->
+            <div class="tab-headers">
+                <button class="tab-btn active" data-tab="tab-audit">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    Compliance Audit
+                </button>
+                <button class="tab-btn" data-tab="tab-extraction">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    Extracted Fields
+                </button>
+                <button class="tab-btn" data-tab="tab-ledger">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    Ledger & Exporters
+                </button>
+            </div>
+
+            <!-- Tab Content Containers -->
+            <div class="tab-contents">
+                <!-- TAB 1: COMPLIANCE AUDIT -->
+                <div class="tab-panel active" id="tab-audit">
+                    <div class="audit-rules-list" id="auditRulesList">
+                        <div class="empty-state">
+                            <p>No audit results yet. Click <strong>"1-Click Extract & Audit"</strong> on the left panel to execute the deterministic rule engine.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: EXTRACTION RESULTS -->
+                <div class="tab-panel" id="tab-extraction">
+                    <div class="extraction-view" id="extractionView">
+                        <!-- Entity Cards -->
+                        <div class="two-column-grid">
+                            <div class="info-card">
+                                <h4>Supplier (Seller)</h4>
+                                <div class="field-row">
+                                    <span class="field-label">Name:</span>
+                                    <span class="field-value highlightable" id="fieldSupplierName" data-field="supplier_name">--</span>
+                                </div>
+                                <div class="field-row">
+                                    <span class="field-label">TIN:</span>
+                                    <span class="field-value highlightable" id="fieldSupplierTIN" data-field="supplier_tin">--</span>
+                                </div>
+                                <div class="field-row">
+                                    <span class="field-label">Address:</span>
+                                    <span class="field-value" id="fieldSupplierAddress">--</span>
+                                </div>
+                            </div>
+
+                            <div class="info-card">
+                                <h4>Customer (Buyer)</h4>
+                                <div class="field-row">
+                                    <span class="field-label">Name:</span>
+                                    <span class="field-value highlightable" id="fieldBuyerName" data-field="buyer_name">--</span>
+                                </div>
+                                <div class="field-row">
+                                    <span class="field-label">TIN:</span>
+                                    <span class="field-value highlightable" id="fieldBuyerTIN" data-field="buyer_tin">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Invoice Metadata -->
+                        <div class="info-card mt-3">
+                            <h4>Invoice Information & BIR Markers</h4>
+                            <div class="three-column-grid">
+                                <div class="field-row">
+                                    <span class="field-label">Invoice #:</span>
+                                    <span class="field-value highlightable" id="fieldInvoiceNumber" data-field="invoice_number">--</span>
+                                </div>
+                                <div class="field-row">
+                                    <span class="field-label">Invoice Date:</span>
+                                    <span class="field-value highlightable" id="fieldInvoiceDate" data-field="invoice_date">--</span>
+                                </div>
+                                <div class="field-row">
+                                    <span class="field-label">PO Ref:</span>
+                                    <span class="field-value highlightable" id="fieldPORef" data-field="po_reference">--</span>
+                                </div>
+                                <div class="field-row">
+                                    <span class="field-label">BIR ATP / PTU:</span>
+                                    <span class="field-value highlightable" id="fieldATPNumber" data-field="atp_number">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Line Items -->
+                        <div class="info-card mt-3">
+                            <h4>Line Items</h4>
+                            <div class="table-responsive">
+                                <table class="data-table" id="lineItemsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Description</th>
+                                            <th class="text-right">Qty</th>
+                                            <th class="text-right">Unit Price</th>
+                                            <th class="text-right">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="lineItemsBody">
+                                        <tr><td colspan="4" class="text-center text-muted">No line items extracted.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Financial Totals -->
+                        <div class="info-card mt-3 financial-totals-card">
+                            <h4>Philippine Tax & Amount Breakdown</h4>
+                            <div class="totals-table">
+                                <div class="total-row">
+                                    <span>Vatable Sales (Base Net of VAT):</span>
+                                    <strong id="fieldVatableSales" class="highlightable" data-field="vatable_sales">PHP 0.00</strong>
+                                </div>
+                                <div class="total-row">
+                                    <span>12% Value-Added Tax (VAT):</span>
+                                    <strong id="fieldVatAmount" class="highlightable" data-field="vat_amount">PHP 0.00</strong>
+                                </div>
+                                <div class="total-row">
+                                    <span>VAT-Exempt Sales:</span>
+                                    <strong id="fieldVatExempt">PHP 0.00</strong>
+                                </div>
+                                <div class="total-row">
+                                    <span>Zero-Rated Sales:</span>
+                                    <strong id="fieldZeroRated">PHP 0.00</strong>
+                                </div>
+                                <div class="total-row grand-total-row">
+                                    <span>Total Amount Due:</span>
+                                    <strong id="fieldTotalAmount" class="highlightable" data-field="total_amount">PHP 0.00</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: ACCOUNTING LEDGER & EXPORTS -->
+                <div class="tab-panel" id="tab-ledger">
+                    <div class="ledger-view">
+                        <!-- Journal Entry Preview -->
+                        <div class="info-card">
+                            <h4>Accounting Journal Entry Preview (Double-Entry)</h4>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Account Code & Title</th>
+                                            <th class="text-right">Debit (PHP)</th>
+                                            <th class="text-right">Credit (PHP)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="journalEntryBody">
+                                        <tr>
+                                            <td>50000 Purchases / Cost of Goods Sold</td>
+                                            <td class="text-right" id="journalDebitExpense">0.00</td>
+                                            <td class="text-right">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td>12000 Input Tax (12% Philippine VAT)</td>
+                                            <td class="text-right" id="journalDebitVAT">0.00</td>
+                                            <td class="text-right">-</td>
+                                        </tr>
+                                        <tr id="journalEwtRow" style="display: none;">
+                                            <td>21000 Creditable Withholding Tax (BIR Form 2307)</td>
+                                            <td class="text-right">-</td>
+                                            <td class="text-right" id="journalCreditEWT">0.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>20000 Accounts Payable / Vendor Liability</td>
+                                            <td class="text-right">-</td>
+                                            <td class="text-right" id="journalCreditAP">0.00</td>
+                                        </tr>
+                                        <tr class="table-total-row">
+                                            <td><strong>Totals (Balanced):</strong></td>
+                                            <td class="text-right"><strong id="journalTotalDebit">0.00</strong></td>
+                                            <td class="text-right"><strong id="journalTotalCredit">0.00</strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 1-Click Exporters -->
+                        <div class="info-card mt-3">
+                            <h4>1-Click Accounting & Tax Exporters</h4>
+                            <p class="export-sub">Export verified entries directly into ERP formats or official BIR statutory filings:</p>
+                            <div class="export-buttons-grid">
+                                <a id="btnExportQuickBooks" href="#" class="btn-export btn-qb">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    QuickBooks Online CSV
+                                </a>
+                                <a id="btnExportXero" href="#" class="btn-export btn-xero">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    Xero Accounting CSV
+                                </a>
+                                <a id="btnExportSLSP" href="#" class="btn-export btn-bir">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    BIR SLSP Purchases CSV
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/web/js/workspace.js"></script>
+</body>
+</html>
