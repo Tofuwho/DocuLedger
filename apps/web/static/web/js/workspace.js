@@ -57,6 +57,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    function getPdfEmbedUrl(url) {
+        if (!url) return '';
+        const cleanUrl = url.split('#')[0];
+        return `${cleanUrl}#toolbar=0&navpanes=0&view=FitH`;
+    }
+
     function selectDocument(card) {
         activeDocId = card.getAttribute('data-id');
         activeDocUrl = card.getAttribute('data-url');
@@ -66,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (viewerFileName) viewerFileName.textContent = filename;
 
         if (pdfIframe && activeDocUrl) {
-            pdfIframe.src = activeDocUrl;
+            pdfIframe.src = getPdfEmbedUrl(activeDocUrl);
         }
         if (btnOpenPdfNewTab && activeDocUrl) {
             btnOpenPdfNewTab.href = activeDocUrl;
@@ -166,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (currentDocLabel) currentDocLabel.textContent = data.file_name;
             if (viewerFileName) viewerFileName.textContent = data.file_name;
-            if (pdfIframe) pdfIframe.src = data.file_url;
+            if (pdfIframe) pdfIframe.src = getPdfEmbedUrl(data.file_url);
             if (btnOpenPdfNewTab) btnOpenPdfNewTab.href = data.file_url;
 
             // Deselect existing sample cards

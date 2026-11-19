@@ -485,10 +485,19 @@ body.app-shell {
     flex-shrink: 0;
 }
 
-.toolbar-left, .toolbar-right {
+.toolbar-left {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+}
+
+.toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
 .viewer-doc-badge {
@@ -500,13 +509,13 @@ body.app-shell {
     padding: 2px 6px;
     border-radius: 4px;
     color: var(--text-muted);
+    flex-shrink: 0;
 }
 
 .viewer-file-title {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 700;
     color: var(--text-primary);
-    max-width: 320px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -523,12 +532,13 @@ body.app-shell {
     border: 1px solid var(--border-default);
     padding: 3px 8px;
     border-radius: 9999px;
+    white-space: nowrap;
 }
 
 .viewer-canvas {
     flex: 1;
     position: relative;
-    background-color: #334155; /* Neutral neutral canvas frame */
+    background-color: #F8FAFC;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -548,6 +558,7 @@ body.app-shell {
     inset: 0;
     pointer-events: none;
     z-index: 10;
+    background: transparent;
 }
 
 .highlight-box {
