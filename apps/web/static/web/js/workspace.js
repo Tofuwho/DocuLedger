@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pdfIframe = document.getElementById('pdfIframe');
     const spatialOverlay = document.getElementById('spatialOverlay');
     const currentDocLabel = document.getElementById('currentDocLabel');
+    const btnOpenPdfNewTab = document.getElementById('btnOpenPdfNewTab');
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabPanels = document.querySelectorAll('.tab-panel');
 
@@ -59,6 +60,9 @@ document.addEventListener('DOMContentLoaded', () => {
         currentDocLabel.textContent = filename;
         if (pdfIframe && activeDocUrl) {
             pdfIframe.src = activeDocUrl;
+        }
+        if (btnOpenPdfNewTab && activeDocUrl) {
+            btnOpenPdfNewTab.href = activeDocUrl;
         }
 
         // Reset export links
@@ -124,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             activeDocUrl = data.file_url;
             currentDocLabel.textContent = data.file_name;
             if (pdfIframe) pdfIframe.src = data.file_url;
+            if (btnOpenPdfNewTab) btnOpenPdfNewTab.href = data.file_url;
 
             // Deselect sample cards
             sampleCards.forEach(c => c.classList.remove('active'));

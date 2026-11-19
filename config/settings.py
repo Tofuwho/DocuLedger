@@ -121,6 +121,9 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Clickjacking protection: allow embedding in same-origin iframes for PDF preview
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Django REST Framework
