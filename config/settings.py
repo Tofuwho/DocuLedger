@@ -112,10 +112,8 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    BASE_DIR / 'apps' / 'web' / 'static',
-]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = []
 
 # Media files (Uploaded and generated PDFs)
 MEDIA_URL = '/media/'
