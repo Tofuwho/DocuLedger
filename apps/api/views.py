@@ -361,15 +361,15 @@ class LedgerListView(views.APIView):
 
 
 class OpenAPISchemaView(views.APIView):
-    """Returns OpenAPI schema definition for DocuLedger REST API."""
+    """Returns OpenAPI schema definition for ProcuLedger REST API."""
 
     def get(self, request, *args, **kwargs):
         schema = {
             "openapi": "3.0.3",
             "info": {
-                "title": "DocuLedger PH REST API",
-                "version": "1.0.0",
-                "description": "Automated Philippine Document-to-Ledger Extraction and Compliance Audit Engine"
+                "title": "ProcuLedger REST API",
+                "version": "1.1.0",
+                "description": "Automated Document-to-Ledger Extraction and Compliance Audit Engine"
             },
             "paths": {
                 "/api/documents/upload/": {"post": {"summary": "Upload a PDF document"}},

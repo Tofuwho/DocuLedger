@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocuLedger PH — Automated Document-to-Ledger & Compliance Audit</title>
+    <title>ProcuLedger — Automated Document-to-Ledger & Compliance Audit</title>
     <link rel="stylesheet" href="/static/web/css/workspace.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,8 +23,8 @@
                 </svg>
             </div>
             <div>
-                <span class="brand-title">DocuLedger <span class="badge-ph">PH</span></span>
-                <span class="brand-subtitle">Philippine Tax & Ledger Audit Engine</span>
+                <span class="brand-title">ProcuLedger</span>
+                <span class="brand-subtitle">Automated Tax & Ledger Audit Engine</span>
             </div>
         </div>
 
@@ -48,7 +48,7 @@
 
             <!-- Pre-Seeded Sample Document Picker -->
             <div class="sample-picker-section">
-                <label class="section-label">Pre-Seeded Philippine Samples (1-Click Ready):</label>
+                <label class="section-label">Pre-Seeded Sample Documents (1-Click Ready):</label>
                 <div class="sample-grid">
                     {% for sample in samples %}
                     <div class="sample-card {% if forloop.first %}active{% endif %}" 
@@ -93,7 +93,7 @@
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    <p class="dropzone-text"><strong>Click to upload</strong> or drag & drop Philippine PDF</p>
+                    <p class="dropzone-text"><strong>Click to upload</strong> or drag & drop PDF</p>
                     <p class="dropzone-sub">Supports digital Sales Invoices, Purchase Orders, and BIR 2307</p>
                 </div>
             </div>
@@ -143,7 +143,7 @@
                         <span class="doc-type-badge" id="detectedDocTypeBadge">--</span>
                     </div>
                     <h3 id="auditSummaryText">Select a sample or upload a document and click "1-Click Extract & Audit".</h3>
-                    <p id="auditSubText" class="audit-sub">Complies with Philippine BIR Revenue Regulations & TRAIN law.</p>
+                    <p id="auditSubText" class="audit-sub">Complies with statutory BIR Revenue Regulations & TRAIN law.</p>
                 </div>
             </div>
 
@@ -253,7 +253,7 @@
 
                         <!-- Financial Totals -->
                         <div class="info-card mt-3 financial-totals-card">
-                            <h4>Philippine Tax & Amount Breakdown</h4>
+                            <h4>Tax & Amount Breakdown</h4>
                             <div class="totals-table">
                                 <div class="total-row">
                                     <span>Vatable Sales (Base Net of VAT):</span>

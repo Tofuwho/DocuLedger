@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: doculedger
+    name: proculedger
     runtime: python
     buildCommand: "./build.sh"
     startCommand: "gunicorn config.wsgi:application"

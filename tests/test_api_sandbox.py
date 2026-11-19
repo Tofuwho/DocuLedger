@@ -22,7 +22,7 @@ def test_root_workspace_loads_zero_login(api_client):
     """Verifies that the root route (/) renders the recruiter sandbox workspace with HTTP 200."""
     response = api_client.get('/')
     assert response.status_code == 200
-    assert b"DocuLedger" in response.content
+    assert b"ProcuLedger" in response.content
     assert b"1-Click Extract & Audit" in response.content
 
 

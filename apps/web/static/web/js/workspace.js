@@ -1,5 +1,5 @@
 /**
- * DocuLedger PH — Zero-Login Recruiter Sandbox Client
+ * ProcuLedger — Zero-Login Recruiter Sandbox Client
  * Handles 1-click extraction, compliance audit, bounding-box overlays, and exports.
  */
 
