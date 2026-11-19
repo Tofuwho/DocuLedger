@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body class="app-shell">
     <!-- Top Global App Bar -->
@@ -164,8 +165,13 @@
             </div>
 
             <div class="viewer-canvas" id="viewerBody">
-                <iframe id="pdfIframe" src="" class="pdf-iframe-element"></iframe>
-                <div id="spatialOverlay" class="spatial-overlay"></div>
+                <div class="canvas-scroll-container" id="canvasScrollContainer">
+                    <div class="canvas-wrapper" id="canvasWrapper">
+                        <canvas id="pdfCanvas" class="pdf-canvas-element"></canvas>
+                        <div id="spatialOverlay" class="spatial-overlay"></div>
+                    </div>
+                    <iframe id="pdfIframe" src="" class="pdf-iframe-fallback" style="display: none;"></iframe>
+                </div>
             </div>
         </section>
 

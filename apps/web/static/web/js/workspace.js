@@ -57,10 +57,78 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // PDF.js Integration
+    if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    let pdfDoc = null;
+    let currentRenderScale = 1.0;
+
     function getPdfEmbedUrl(url) {
         if (!url) return '';
         const cleanUrl = url.split('#')[0];
         return `${cleanUrl}#toolbar=0&navpanes=0&view=FitH`;
+    }
+
+    async function renderPdfDocument(url) {
+        const canvas = document.getElementById('pdfCanvas');
+        const fallbackIframe = document.getElementById('pdfIframe');
+        const wrapper = document.getElementById('canvasWrapper');
+
+        if (!window.pdfjsLib || !canvas) {
+            if (fallbackIframe) {
+                fallbackIframe.style.display = 'block';
+                if (wrapper) wrapper.style.display = 'none';
+                fallbackIframe.src = getPdfEmbedUrl(url);
+            }
+            return;
+        }
+
+        try {
+            const loadingTask = pdfjsLib.getDocument(url);
+            pdfDoc = await loadingTask.promise;
+            await renderPdfPage(1);
+            if (canvas) canvas.style.display = 'block';
+            if (wrapper) wrapper.style.display = 'inline-block';
+            if (fallbackIframe) fallbackIframe.style.display = 'none';
+        } catch (err) {
+            console.warn('PDF.js render failed, using iframe fallback:', err);
+            if (fallbackIframe) {
+                fallbackIframe.style.display = 'block';
+                if (wrapper) wrapper.style.display = 'none';
+                fallbackIframe.src = getPdfEmbedUrl(url);
+            }
+        }
+    }
+
+    async function renderPdfPage(num) {
+        if (!pdfDoc) return;
+        const page = await pdfDoc.getPage(num);
+        const canvas = document.getElementById('pdfCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvasScrollContainer');
+
+        const containerWidth = (container ? container.clientWidth : 700) - 48;
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        const scale = Math.min(2.0, Math.max(0.8, containerWidth / unscaledViewport.width));
+        currentRenderScale = scale;
+
+        const viewport = page.getViewport({ scale: scale });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+            canvasContext: ctx,
+            viewport: viewport
+        };
+
+        await page.render(renderContext).promise;
+
+        if (spatialOverlay) {
+            spatialOverlay.style.width = `${viewport.width}px`;
+            spatialOverlay.style.height = `${viewport.height}px`;
+        }
     }
 
     function selectDocument(card) {
@@ -71,8 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentDocLabel) currentDocLabel.textContent = filename;
         if (viewerFileName) viewerFileName.textContent = filename;
 
-        if (pdfIframe && activeDocUrl) {
-            pdfIframe.src = getPdfEmbedUrl(activeDocUrl);
+        if (activeDocUrl) {
+            renderPdfDocument(activeDocUrl);
         }
         if (btnOpenPdfNewTab && activeDocUrl) {
             btnOpenPdfNewTab.href = activeDocUrl;
@@ -172,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (currentDocLabel) currentDocLabel.textContent = data.file_name;
             if (viewerFileName) viewerFileName.textContent = data.file_name;
-            if (pdfIframe) pdfIframe.src = getPdfEmbedUrl(data.file_url);
+            if (data.file_url) renderPdfDocument(data.file_url);
             if (btnOpenPdfNewTab) btnOpenPdfNewTab.href = data.file_url;
 
             // Deselect existing sample cards
@@ -432,8 +500,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const boxEl = document.createElement('div');
         boxEl.className = 'highlight-box';
 
-        const containerWidth = spatialOverlay.clientWidth || 550;
-        const containerHeight = spatialOverlay.clientHeight || 750;
+        const canvas = document.getElementById('pdfCanvas');
+        const containerWidth = (canvas && canvas.style.display !== 'none' && canvas.width > 0) ? canvas.width : (spatialOverlay.clientWidth || 550);
+        const containerHeight = (canvas && canvas.style.display !== 'none' && canvas.height > 0) ? canvas.height : (spatialOverlay.clientHeight || 750);
 
         const scaleX = containerWidth / 612;
         const scaleY = containerHeight / 792;
