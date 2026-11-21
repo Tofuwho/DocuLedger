@@ -42,6 +42,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnExportXero = document.getElementById('btnExportXero');
     const btnExportSLSP = document.getElementById('btnExportSLSP');
 
+    // Copilot Elements
+    const copilotFeed = document.getElementById('copilotFeed');
+    const copilotForm = document.getElementById('copilotForm');
+    const copilotInput = document.getElementById('copilotInput');
+    const copilotSuggestionsList = document.getElementById('copilotSuggestionsList');
+
     // 1. Initialize Active Document from first sample
     const firstActiveSample = document.querySelector('.sample-card.active');
     if (firstActiveSample) {
@@ -319,6 +325,10 @@ document.addEventListener('DOMContentLoaded', () => {
         renderExtractionFields(extraction.extracted_data || {});
         renderLedgerEntry(ledger, extraction.extracted_data || {});
         updateExportLinks(doc.id);
+
+        if (copilotBriefing) {
+            renderCopilotBriefing(copilotBriefing);
+        }
     }
 
     function renderScorecard(audit, docType) {
@@ -519,5 +529,190 @@ document.addEventListener('DOMContentLoaded', () => {
         if (spatialOverlay) {
             spatialOverlay.innerHTML = '';
         }
+    }
+
+    // 9. AI Copilot Assistant Functions
+    function renderCopilotBriefing(briefing) {
+        if (!copilotFeed) return;
+        copilotFeed.innerHTML = '';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'copilot-msg-bubble assistant';
+
+        let calloutsHtml = '';
+        (briefing.points_to_know || []).forEach(p => {
+            const cls = p.type === 'danger' ? 'callout-danger' : p.type === 'success' ? 'callout-success' : 'callout-info';
+            calloutsHtml += `
+                <div class="copilot-callout ${cls}">
+                    <span class="callout-title">${p.title}</span>
+                    <p>${p.text}</p>
+                </div>
+            `;
+        });
+
+        let timelineHtml = '';
+        (briefing.pipeline_events || []).forEach(evt => {
+            timelineHtml += `
+                <div class="timeline-step">
+                    <span class="timeline-time">${evt.time}</span>
+                    <span class="timeline-stage">${evt.stage}:</span>
+                    <span class="timeline-desc">${evt.desc}</span>
+                </div>
+            `;
+        });
+
+        let actionsHtml = '';
+        (briefing.recommended_actions || []).forEach(act => {
+            actionsHtml += `<li>${act}</li>`;
+        });
+
+        const isCompliant = briefing.status === 'PASSED';
+        const badgeColor = isCompliant ? 'badge-success' : 'badge-danger';
+        const dotColor = isCompliant ? 'dot-success' : 'dot-danger';
+
+        bubble.innerHTML = `
+            <div class="copilot-msg-header">
+                <span>Executive Audit Briefing</span>
+                <span class="badge ${badgeColor}"><span class="dot ${dotColor}"></span> ${briefing.verdict_badge}</span>
+            </div>
+            <div class="copilot-msg-body">
+                <p><strong>${briefing.verdict_summary}</strong></p>
+                
+                <div class="copilot-timeline">
+                    ${timelineHtml}
+                </div>
+
+                <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+                    ${calloutsHtml}
+                </div>
+
+                <div style="margin-top: 8px;">
+                    <h3 style="font-size: 0.74rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Recommended Action Plan</h3>
+                    <ul>${actionsHtml}</ul>
+                </div>
+            </div>
+        `;
+
+        copilotFeed.appendChild(bubble);
+
+        // Update suggested inquiry chips
+        updateSuggestedChips(briefing.suggested_questions || []);
+    }
+
+    function updateSuggestedChips(questions) {
+        if (!copilotSuggestionsList) return;
+        copilotSuggestionsList.innerHTML = '';
+        questions.forEach(q => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'suggestion-chip';
+            chip.setAttribute('data-q', q);
+            chip.textContent = q;
+            chip.addEventListener('click', () => {
+                sendCopilotQuestion(q);
+            });
+            copilotSuggestionsList.appendChild(chip);
+        });
+    }
+
+    // Handle suggestion chips initially present
+    document.querySelectorAll('.suggestion-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const q = chip.getAttribute('data-q');
+            if (q) sendCopilotQuestion(q);
+        });
+    });
+
+    // Handle chat form submit
+    if (copilotForm) {
+        copilotForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = copilotInput ? copilotInput.value.trim() : '';
+            if (text) {
+                sendCopilotQuestion(text);
+                copilotInput.value = '';
+            }
+        });
+    }
+
+    async function sendCopilotQuestion(questionText) {
+        if (!questionText || !activeDocId) return;
+
+        // Append user message bubble
+        appendChatBubble('user', questionText);
+
+        // Append typing indicator
+        const typingId = 'typing-' + Date.now();
+        const typingEl = document.createElement('div');
+        typingEl.id = typingId;
+        typingEl.className = 'copilot-msg-bubble assistant';
+        typingEl.innerHTML = `<span style="color: var(--text-muted); font-style: italic;">Analyzing document and tax regulations...</span>`;
+        if (copilotFeed) copilotFeed.appendChild(typingEl);
+        scrollCopilotToBottom();
+
+        try {
+            const res = await fetch('/api/copilot/chat/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ document_id: activeDocId, message: questionText })
+            });
+
+            const typingNode = document.getElementById(typingId);
+            if (typingNode) typingNode.remove();
+
+            if (!res.ok) throw new Error('Failed to get answer from Copilot.');
+            const data = await res.json();
+
+            // Append assistant reply bubble
+            appendChatBubble('assistant', formatMarkdown(data.reply));
+
+            if (data.suggested_questions && data.suggested_questions.length > 0) {
+                updateSuggestedChips(data.suggested_questions);
+            }
+        } catch (err) {
+            const typingNode = document.getElementById(typingId);
+            if (typingNode) typingNode.remove();
+            appendChatBubble('assistant', `⚠️ Error communicating with Copilot: ${err.message}`);
+        }
+    }
+
+    function appendChatBubble(role, htmlContent) {
+        if (!copilotFeed) return;
+        const bubble = document.createElement('div');
+        bubble.className = `copilot-msg-bubble ${role}`;
+        
+        if (role === 'assistant') {
+            bubble.innerHTML = `
+                <div class="copilot-msg-header">
+                    <span>ProcuLedger Copilot</span>
+                    <span>Just now</span>
+                </div>
+                <div class="copilot-msg-body">${htmlContent}</div>
+            `;
+        } else {
+            bubble.innerHTML = `<div class="copilot-msg-body">${htmlContent}</div>`;
+        }
+
+        copilotFeed.appendChild(bubble);
+        scrollCopilotToBottom();
+    }
+
+    function scrollCopilotToBottom() {
+        const inspectorContent = document.querySelector('.inspector-content');
+        if (inspectorContent) {
+            inspectorContent.scrollTop = inspectorContent.scrollHeight;
+        }
+    }
+
+    function formatMarkdown(text) {
+        if (!text) return '';
+        return text
+            .replace(/### (.*?)\n/g, '<h3 style="font-size: 0.82rem; font-weight: 700; margin: 4px 0 6px;">$1</h3>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`(.*?)`/g, '<code style="background: var(--surface-subtle); padding: 1px 4px; border-radius: 3px; font-family: monospace;">$1</code>')
+            .replace(/^- (.*?)(\n|$)/gm, '<li>$1</li>')
+            .replace(/\n\n/g, '<p></p>')
+            .replace(/\n/g, '<br>');
     }
 });

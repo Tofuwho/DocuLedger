@@ -14,11 +14,15 @@ from .views import (
     ExportSLSPView,
     LedgerListView,
     OpenAPISchemaView,
+    CopilotChatView,
 )
 
 app_name = 'api'
 
 urlpatterns = [
+    # AI Auditor Copilot
+    path('copilot/chat/', CopilotChatView.as_view(), name='copilot_chat'),
+
     # Document Lifecycle
     path('documents/upload/', DocumentUploadView.as_view(), name='document_upload'),
     path('documents/<int:pk>/extract/', DocumentExtractView.as_view(), name='document_extract'),

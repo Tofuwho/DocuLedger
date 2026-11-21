@@ -273,11 +273,77 @@ class DocumentExtractAndAuditView(views.APIView):
         ledger_entry = getattr(doc, 'invoice_entry', None)
         ledger_data = InvoiceLedgerEntrySerializer(ledger_entry).data if ledger_entry else None
 
+        from apps.auditor.copilot import generate_audit_briefing
+        briefing = generate_audit_briefing(doc, extract_res.data, audit_res.data, ledger_data)
+
         return Response({
             'document': DocumentSerializer(doc, context={'request': request}).data,
             'extraction': extract_res.data,
             'audit': audit_res.data,
             'ledger_entry': ledger_data,
+            'copilot_briefing': briefing,
+        })
+
+
+class CopilotChatView(views.APIView):
+    """
+    AI Auditor Copilot Q&A & Briefing endpoint.
+    Answers user questions contextually or provides an executive briefing.
+    """
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
+
+    def post(self, request, *args, **kwargs):
+        doc_id = request.data.get('document_id')
+        message = request.data.get('message', '').strip()
+
+        if not doc_id:
+            return Response({'error': 'document_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        doc = get_object_or_404(Document, pk=doc_id)
+        ledger_entry = getattr(doc, 'invoice_entry', None)
+
+        if not ledger_entry or doc.status != 'AUDITED':
+            extract_view = DocumentExtractView()
+            extract_res = extract_view.post(request, pk=doc.id)
+            audit_view = DocumentAuditView()
+            audit_res = audit_view.post(request, pk=doc.id)
+            doc.refresh_from_db()
+            ledger_entry = getattr(doc, 'invoice_entry', None)
+            extract_data = extract_res.data
+            audit_data = audit_res.data
+        else:
+            extract_data = {
+                'extracted_data': InvoiceLedgerEntrySerializer(ledger_entry).data,
+                'document_type': doc.document_type
+            }
+            audit_data = {
+                'status': ledger_entry.audit_status,
+                'score': ledger_entry.audit_score,
+                'results': [
+                    {
+                        'rule_name': log.rule_name,
+                        'rule_category': log.rule_category,
+                        'status': log.status,
+                        'message': log.message,
+                        'details': log.details
+                    }
+                    for log in doc.audit_logs.all()
+                ]
+            }
+
+        ledger_data = InvoiceLedgerEntrySerializer(ledger_entry).data if ledger_entry else None
+        from apps.auditor.copilot import generate_audit_briefing, answer_copilot_question
+
+        if not message:
+            briefing = generate_audit_briefing(doc, extract_data, audit_data, ledger_data)
+            return Response({'briefing': briefing})
+
+        reply = answer_copilot_question(message, doc, extract_data, audit_data, ledger_data)
+        briefing = generate_audit_briefing(doc, extract_data, audit_data, ledger_data)
+
+        return Response({
+            'reply': reply,
+            'suggested_questions': briefing.get('suggested_questions', [])
         })
 
 
