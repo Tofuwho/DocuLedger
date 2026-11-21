@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function selectDocument(card) {
+    async function selectDocument(card) {
         activeDocId = card.getAttribute('data-id');
         activeDocUrl = card.getAttribute('data-url');
         const filename = card.getAttribute('data-filename');
@@ -153,6 +153,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateExportLinks(activeDocId);
+
+        // Fetch and display Copilot briefing for selected document
+        try {
+            const res = await fetch('/api/copilot/chat/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ document_id: activeDocId })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.briefing) {
+                    renderCopilotBriefing(data.briefing);
+                }
+            }
+        } catch (e) {
+            console.warn('Briefing load error:', e);
+        }
     }
 
     // 3. Tab Navigation (Inspector)
@@ -316,6 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const extraction = payload.extraction;
         const audit = payload.audit;
         const ledger = payload.ledger_entry;
+        const copilotBriefing = payload.copilot_briefing;
 
         currentBoundingBoxes = extraction.bounding_boxes || {};
         currentDocType = extraction.document_type || 'SALES_INVOICE';
