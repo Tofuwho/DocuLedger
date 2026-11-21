@@ -10,6 +10,97 @@ from typing import Dict, Any, List, Optional
 import os
 
 
+def safe_decimal(val, default='0.00') -> Decimal:
+    if val is None or val == '':
+        return Decimal(default)
+    try:
+        return Decimal(str(val))
+    except Exception:
+        return Decimal(default)
+
+
+def safe_float(val, default=0.0) -> float:
+    if val is None or val == '':
+        return default
+    try:
+        return float(val)
+    except Exception:
+        return default
+
+
+def extract_financial_context(
+    document: Any,
+    extraction: Optional[Dict[str, Any]] = None,
+    audit: Optional[Dict[str, Any]] = None,
+    ledger: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Extracts all financial, entity, and tax fields safely across extraction, audit, ledger, and document models.
+    Guarantees no KeyError and never yields 0 when valid invoice data exists.
+    """
+    data: Dict[str, Any] = {}
+
+    # 1. From extraction dict
+    if extraction and isinstance(extraction, dict):
+        if 'extracted_data' in extraction and isinstance(extraction['extracted_data'], dict):
+            data.update(extraction['extracted_data'])
+        else:
+            data.update(extraction)
+
+    # 2. From ledger dict
+    if ledger and isinstance(ledger, dict):
+        for k, v in ledger.items():
+            if v is not None and v != '' and (k not in data or data.get(k) in [None, '', 0, '0', '0.00']):
+                data[k] = v
+
+    # 3. From document.invoice_entry (ORM)
+    if document and hasattr(document, 'invoice_entry') and document.invoice_entry:
+        inv = document.invoice_entry
+        field_names = [
+            'supplier_name', 'supplier_tin', 'supplier_address',
+            'buyer_name', 'buyer_tin', 'invoice_number', 'invoice_date',
+            'vatable_sales', 'vat_amount', 'vat_exempt_sales', 'zero_rated_sales',
+            'total_amount', 'atp_number', 'po_reference'
+        ]
+        for field in field_names:
+            val = getattr(inv, field, None)
+            if val is not None and val != '' and (field not in data or data.get(field) in [None, '', 0, '0', '0.00']):
+                data[field] = val
+
+    vatable_sales = safe_decimal(data.get('vatable_sales'))
+    vat_amount = safe_decimal(data.get('vat_amount'))
+    total_amount = safe_decimal(data.get('total_amount'))
+    expected_vat = (vatable_sales * Decimal('0.12')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    vat_diff = vat_amount - expected_vat
+
+    supplier_name = data.get('supplier_name') or data.get('vendor_name') or data.get('payee_name') or 'Unknown Supplier'
+    buyer_name = data.get('buyer_name') or data.get('payor_name') or 'Unknown Buyer'
+    invoice_number = data.get('invoice_number') or data.get('po_number') or 'N/A'
+    invoice_date = data.get('invoice_date') or data.get('po_date') or 'N/A'
+    supplier_tin = data.get('supplier_tin') or ''
+    buyer_tin = data.get('buyer_tin') or ''
+    po_reference = data.get('po_reference') or ''
+
+    return {
+        'supplier_name': supplier_name,
+        'buyer_name': buyer_name,
+        'invoice_number': invoice_number,
+        'invoice_date': str(invoice_date) if invoice_date else 'N/A',
+        'vatable_sales': vatable_sales,
+        'vat_amount': vat_amount,
+        'total_amount': total_amount,
+        'expected_vat': expected_vat,
+        'vat_diff': vat_diff,
+        'vatable_sales_flt': safe_float(vatable_sales),
+        'vat_amount_flt': safe_float(vat_amount),
+        'total_amount_flt': safe_float(total_amount),
+        'supplier_tin': supplier_tin,
+        'buyer_tin': buyer_tin,
+        'po_reference': po_reference,
+        'raw': data
+    }
+
+
 def generate_audit_briefing(
     document: Any,
     extraction: Dict[str, Any],
@@ -20,26 +111,25 @@ def generate_audit_briefing(
     Synthesizes a comprehensive executive briefing from the audit and extraction data.
     Explains what happened during processing, highlights critical issues, and provides actionable guidance.
     """
-    extracted_data = extraction.get('extracted_data', {}) if extraction else {}
+    ctx = extract_financial_context(document, extraction, audit, ledger)
     doc_type = extraction.get('document_type', 'SALES_INVOICE') if extraction else 'SALES_INVOICE'
     audit_results = audit.get('results', []) if audit else []
     score = audit.get('score', 100) if audit else 100
     status = audit.get('status', 'PASSED') if audit else 'PASSED'
 
-    supplier_name = extracted_data.get('supplier_name') or extracted_data.get('vendor_name') or 'Unknown Supplier'
-    buyer_name = extracted_data.get('buyer_name') or extracted_data.get('payor_name') or 'Unknown Buyer'
-    invoice_num = extracted_data.get('invoice_number') or extracted_data.get('po_number') or 'N/A'
-    invoice_date = extracted_data.get('invoice_date') or extracted_data.get('po_date') or 'N/A'
-    
-    vatable_sales = float(extracted_data.get('vatable_sales') or 0.0)
-    vat_amount = float(extracted_data.get('vat_amount') or 0.0)
-    total_amount = float(extracted_data.get('total_amount') or 0.0)
-    supplier_tin = extracted_data.get('supplier_tin', '')
-    buyer_tin = extracted_data.get('buyer_tin', '')
-    po_ref = extracted_data.get('po_reference', '')
+    supplier_name = ctx['supplier_name']
+    buyer_name = ctx['buyer_name']
+    invoice_num = ctx['invoice_number']
+    invoice_date = ctx['invoice_date']
+    vatable_sales = ctx['vatable_sales_flt']
+    vat_amount = ctx['vat_amount_flt']
+    total_amount = ctx['total_amount_flt']
+    supplier_tin = ctx['supplier_tin']
+    buyer_tin = ctx['buyer_tin']
+    po_ref = ctx['po_reference']
 
     # Compute actual VAT percentage
-    computed_vat_rate = (Decimal(str(vat_amount)) / Decimal(str(vatable_sales)) * 100).quantize(Decimal('0.01')) if vatable_sales else Decimal('0.00')
+    computed_vat_rate = (ctx['vat_amount'] / ctx['vatable_sales'] * 100).quantize(Decimal('0.01')) if ctx['vatable_sales'] > 0 else Decimal('0.00')
 
     # Identify failing & passing rules
     failing_rules = [r for r in audit_results if r.get('status') == 'FAIL']
@@ -89,7 +179,7 @@ def generate_audit_briefing(
             r_msg = fail.get('message', '')
 
             if 'VAT' in r_name:
-                expected_vat = Decimal(str(vatable_sales)) * Decimal('0.12')
+                expected_vat = ctx['expected_vat']
                 points_to_know.append({
                     'type': 'danger',
                     'title': '🚨 Critical VAT Math Discrepancy',
@@ -123,7 +213,7 @@ def generate_audit_briefing(
     ]
     if 'VAT' in [r.get('rule_name', '') for r in failing_rules]:
         suggested_questions.insert(0, "Explain the VAT discrepancy and TRAIN law penalties")
-    if '307' in str(extracted_data) or po_ref:
+    if '307' in str(ctx['raw']) or po_ref:
         suggested_questions.append("Explain BIR Form 2307 and ATC code WC158")
 
     return {
@@ -141,8 +231,8 @@ def generate_audit_briefing(
         'suggested_questions': suggested_questions[:4],
         'pipeline_events': [
             {"time": "0.02s", "stage": "Spatial Text Parser", "desc": "Ingested PDF document geometry, detected blocks, and line coordinates via PyMuPDF."},
-            {"time": "0.05s", "stage": "Schema Extraction", "desc": f"Identified {doc_type.replace('_', ' ')}: {len(extracted_data.get('line_items', []))} line items extracted."},
-            {"time": "0.08s", "stage": "Tax & Rules Engine", "desc": f"Evaluated 8 deterministic statutory compliance checks (Score: {score}/100)."},
+            {"time": "0.05s", "stage": "Schema Extraction", "desc": f"Identified {doc_type.replace('_', ' ')}: {len(ctx['raw'].get('line_items', []))} line items extracted."},
+            {"time": "0.08s", "stage": "Tax & Rules Engine", "desc": f"Evaluated {len(audit_results)} deterministic statutory compliance checks (Score: {score}/100)."},
             {"time": "0.10s", "stage": "Ledger Synthesis", "desc": "Generated balanced double-entry accounting entries for ERP export."}
         ]
     }
@@ -159,29 +249,29 @@ def answer_copilot_question(
     Answers user questions contextually based on the active document and Philippine tax regulations.
     """
     q = question.lower().strip()
-    extracted_data = extraction.get('extracted_data', {}) if extraction else {}
+    ctx = extract_financial_context(document, extraction, audit, ledger)
     audit_results = audit.get('results', []) if audit else []
     score = audit.get('score', 100) if audit else 100
     status = audit.get('status', 'PASSED') if audit else 'PASSED'
 
-    supplier = extracted_data.get('supplier_name', 'the Supplier')
-    invoice_no = extracted_data.get('invoice_number', 'this invoice')
-    vatable = Decimal(str(extracted_data.get('vatable_sales', 0)))
-    vat = Decimal(str(extracted_data.get('vat_amount', 0)))
-    total = Decimal(str(extracted_data.get('total_amount', 0)))
-    expected_vat = (vatable * Decimal('0.12')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-    vat_diff = vat - expected_vat
+    supplier = ctx['supplier_name']
+    invoice_no = ctx['invoice_number']
+    vatable = ctx['vatable_sales']
+    vat = ctx['vat_amount']
+    total = ctx['total_amount']
+    expected_vat = ctx['expected_vat']
+    vat_diff = ctx['vat_diff']
 
     # 1. Why did it pass or fail / Discrepancy
     if any(k in q for k in ['why', 'fail', 'pass', 'discrepancy', 'error', 'violation', 'status']):
         if status == 'PASSED':
             return (
                 f"### ✅ Audit Passed with 100/100 Score\n\n"
-                f"**Invoice #{invoice_no}** issued by **{supplier}** satisfied all 8 deterministic statutory rules:\n\n"
-                f"1. **12% VAT Precision**: VAT amount (₱{vat:,.2f}) strictly equals 12% of vatable sales (₱{vatable:,.2f}) with ₱0.00 variance.\n"
-                f"2. **TIN Validation**: Both Supplier TIN (`{extracted_data.get('supplier_tin')}`) and Buyer TIN (`{extracted_data.get('buyer_tin')}`) conform to valid 12-digit Head Office formats.\n"
-                f"3. **BIR Statutory Markers**: Mandatory VAT-Registered notice and Authority to Print (ATP) are verified.\n"
-                f"4. **Reconciliation**: Reconciled against purchase orders and BIR Form 2307 withholding certificates."
+                f"**Invoice #{invoice_no}** issued by **{supplier}** satisfied all statutory compliance checks:\n\n"
+                f"- **12% VAT Precision**: VAT amount (`₱{vat:,.2f}`) strictly matches 12.00% of vatable sales (`₱{vatable:,.2f}`) with ₱0.00 variance.\n"
+                f"- **TIN Validation**: Both Supplier TIN (`{ctx['supplier_tin']}`) and Buyer TIN (`{ctx['buyer_tin']}`) conform to BIR 12-digit format.\n"
+                f"- **BIR Statutory Markers**: Mandatory VAT-Registered classification and BIR Authority to Print (ATP) are verified.\n"
+                f"- **Reconciliation**: Reconciled against purchase orders and BIR Form 2307 withholding certificates."
             )
         else:
             failing = [r for r in audit_results if r.get('status') == 'FAIL']
@@ -200,10 +290,10 @@ def answer_copilot_question(
                 f"### 🛡️ Input Tax Claim Eligibility: APPROVED\n\n"
                 f"Yes, you can legally claim the **₱{vat:,.2f}** Input VAT under Section 110 of the Philippine National Internal Revenue Code (NIRC) and BIR Revenue Regulations No. 16-2005.\n\n"
                 f"**Requirements Satisfied:**\n"
-                f"- ✅ Supplier is VAT-Registered with valid TIN `{extracted_data.get('supplier_tin')}`.\n"
-                f"- ✅ VAT amount is separately indicated and computed at the statutory 12% rate.\n"
-                f"- ✅ Official BIR Authority to Print / Permit to Use series is valid.\n"
-                f"- ✅ Balanced double-entry recorded to Account `12000 Input Tax`."
+                f"- Supplier is VAT-Registered with valid TIN `{ctx['supplier_tin']}`.\n"
+                f"- VAT amount is separately indicated and computed at the statutory 12% rate.\n"
+                f"- Official BIR Authority to Print / Permit to Use series is valid.\n"
+                f"- Balanced double-entry recorded to Account `12000 Input Tax`."
             )
         else:
             return (
@@ -217,15 +307,22 @@ def answer_copilot_question(
             )
 
     # 3. 12% VAT Calculation
-    if any(k in q for k in ['vat', '12%', 'calculation', 'math', 'rate', 'percentage']):
-        rate_str = f"{(vat / vatable * 100):.2f}%" if vatable else "0%"
+    if any(k in q for k in ['vat', '12%', 'calculation', 'math', 'rate', 'percentage', 'tax']):
+        rate_str = f"{(vat / vatable * 100):.2f}%" if vatable > 0 else "0.00%"
+        is_balanced = abs(vat_diff) <= Decimal('0.02')
+        
+        if is_balanced:
+            result_block = "✅ **Result**: Perfectly balanced with zero variance (compliant with BIR TRAIN Law)."
+        else:
+            result_block = f"🚨 **Result**: Severe discrepancy! Document billed at **{rate_str}** VAT instead of statutory **12.00%** (Variance: `₱{vat_diff:,.2f}`). Under BIR RR 16-2005, this invalidates Input Tax claims and triggers a 25% statutory penalty."
+
         return (
             f"### 📊 12% Philippine VAT Breakdown\n\n"
             f"- **Vatable Sales (Base Net of VAT)**: `₱{vatable:,.2f}`\n"
             f"- **Statutory 12% Rate**: `₱{vatable:,.2f} × 12.00% = ₱{expected_vat:,.2f}`\n"
             f"- **Actual VAT on Document**: `₱{vat:,.2f}` (Billed rate: **{rate_str}**)\n"
             f"- **Math Variance**: `₱{vat_diff:,.2f}`\n\n"
-            f"{'✅ **Result**: Perfectly balanced with zero variance.' if abs(vat_diff) <= Decimal('0.02') else '🚨 **Result**: Severe discrepancy! Document under-billed/miscalculated VAT.'}"
+            f"{result_block}"
         )
 
     # 4. Form 2307 & ATC WC158
@@ -243,16 +340,16 @@ def answer_copilot_question(
         if status == 'PASSED':
             return (
                 f"### 📋 Recommended Next Steps\n\n"
-                f"1. **Disbursement**: Authorize payment of `₱{total:,.2f}` under agreed payment terms (Net 30).\n"
-                f"2. **Export to ERP**: Click **QuickBooks Online CSV** or **Xero CSV** in the Ledger tab to import the pre-balanced bill.\n"
-                f"3. **Tax Filing**: Include this invoice in your monthly BIR Form 2550M/2550Q VAT return and BIR SLSP Schedule 3 submission."
+                f"- **Disbursement**: Authorize payment of `₱{total:,.2f}` under agreed payment terms (Net 30).\n"
+                f"- **Export to ERP**: Click **QuickBooks Online CSV** or **Xero CSV** in the Ledger tab to import the pre-balanced bill.\n"
+                f"- **Tax Filing**: Include this invoice in your monthly BIR Form 2550M/2550Q VAT return and BIR SLSP Schedule 3 submission."
             )
         else:
             return (
                 f"### 📋 Recommended Action Plan\n\n"
-                f"1. **Hold Payment**: Place a billing hold on Invoice #{invoice_no}.\n"
-                f"2. **Notice to Vendor**: Contact {supplier} Finance department citing Section 106 of the NIRC and the 12% statutory VAT rate requirement.\n"
-                f"3. **Re-Audit**: Once the vendor provides an amended PDF, upload it to ProcuLedger to verify resolution."
+                f"- **Hold Payment**: Place a billing hold on Invoice #{invoice_no}.\n"
+                f"- **Notice to Vendor**: Contact {supplier} Finance department citing Section 106 of the NIRC and the 12% statutory VAT rate requirement.\n"
+                f"- **Re-Audit**: Once the vendor provides an amended PDF, upload it to ProcuLedger to verify resolution."
             )
 
     # Fallback response with helpful overview

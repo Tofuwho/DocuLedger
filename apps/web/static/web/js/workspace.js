@@ -724,13 +724,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatMarkdown(text) {
         if (!text) return '';
-        return text
-            .replace(/### (.*?)\n/g, '<h3 style="font-size: 0.82rem; font-weight: 700; margin: 4px 0 6px;">$1</h3>')
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/`(.*?)`/g, '<code style="background: var(--surface-subtle); padding: 1px 4px; border-radius: 3px; font-family: monospace;">$1</code>')
-            .replace(/^- (.*?)(\n|$)/gm, '<li>$1</li>')
-            .replace(/\n\n/g, '<p></p>')
-            .replace(/\n/g, '<br>');
+        let html = text;
+
+        // Headers
+        html = html.replace(/^### (.*?)$/gm, '<h3 class="copilot-h3">$1</h3>');
+
+        // Bold & Italic
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+        // Inline Code
+        html = html.replace(/`([^`]+)`/g, '<code class="copilot-inline-code">$1</code>');
+
+        // Unordered lists (- items)
+        html = html.replace(/(?:^|\n)(?:- .+(?:\n|$))+/g, match => {
+            const items = match.trim().split('\n').map(line => {
+                const content = line.replace(/^- /, '').trim();
+                return `<li>${content}</li>`;
+            }).join('');
+            return `<ul class="copilot-bullet-list">${items}</ul>`;
+        });
+
+        // Numbered lists (1. items)
+        html = html.replace(/(?:^|\n)(?:\d+\. .+(?:\n|$))+/g, match => {
+            const items = match.trim().split('\n').map(line => {
+                const content = line.replace(/^\d+\.\s*/, '').trim();
+                return `<li>${content}</li>`;
+            }).join('');
+            return `<ol class="copilot-num-list">${items}</ol>`;
+        });
+
+        // Paragraph breaks and remaining newlines
+        html = html.replace(/\n\n+/g, '<div class="copilot-paragraph-gap"></div>');
+        html = html.replace(/\n/g, '<br>');
+
+        return html;
     }
 });

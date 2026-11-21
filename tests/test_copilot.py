@@ -136,3 +136,23 @@ def test_copilot_chat_endpoint(api_client):
     assert 'reply' in res_q.data
     assert 'Input Tax' in res_q.data['reply']
     assert len(res_q.data['suggested_questions']) > 0
+
+
+@pytest.mark.django_db
+def test_copilot_vat_discrepancy_math_breakdown(api_client):
+    doc = Document.objects.filter(file_name__contains='VAT_Discrepancy').first()
+    assert doc is not None
+
+    url = reverse('api:copilot_chat')
+    res = api_client.post(url, {
+        'document_id': doc.id,
+        'message': 'Explain the 12% VAT calculation in detail'
+    }, format='json')
+
+    assert res.status_code == 200
+    reply = res.data['reply']
+    assert '12% Philippine VAT Breakdown' in reply
+    assert '₱50,000.00' in reply
+    assert '₱5,000.00' in reply
+    assert '10.00%' in reply
+    assert 'Severe discrepancy' in reply
